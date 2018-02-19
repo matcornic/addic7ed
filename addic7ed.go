@@ -3,13 +3,17 @@ package addic7ed
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"unicode"
 
 	"github.com/PuerkitoBio/goquery"
 	textdistance "github.com/masatana/go-textdistance"
 )
+
+const userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:12.0) Gecko/20100101 Firefox/12.0"
 
 // Client is the addic7ed client
 type Client struct {
@@ -57,7 +61,7 @@ func createDocFromURL(url string) (*goquery.Document, error) {
 	}
 	// Avoid getting cached pages
 	req.Header.Add("Cache-Control", "no-cache")
-	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:12.0) Gecko/20100101 Firefox/12.0")
+	req.Header.Add("User-Agent", userAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -292,6 +296,33 @@ func (s Subtitle) String() string {
 // It means that the subtitle comes with different version and this subtitle is the original one.
 func (s Subtitle) IsOriginal() bool {
 	return !s.IsUpdated()
+}
+
+// DownloadTo download the subtitle to a given path
+func (s Subtitle) DownloadTo(path string) error {
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", s.Link, nil)
+	if err != nil {
+		return err
+	}
+	// Avoid getting cached pages
+	req.Header.Add("Cache-Control", "no-cache")
+	req.Header.Add("User-Agent", userAgent)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("Unable to reach addic7ed server: %v", err)
+	}
+	defer resp.Body.Close()
+
+	w, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	_, err = io.Copy(w, resp.Body)
+	return err
 }
 
 // IsUpdated checks whether the subtitle is updated.
