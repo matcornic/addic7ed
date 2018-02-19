@@ -2,7 +2,6 @@ package addic7ed_test
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"testing"
 
@@ -10,13 +9,6 @@ import (
 
 	"github.com/matcornic/addic7ed"
 )
-
-func ExampleSearchAll() {
-	c := addic7ed.New()
-	actualShow, _ := c.SearchAll("Shameless.US.S08E11.720p.HDTV.x264-BATV[ettv]")
-	fmt.Println(actualShow.Name)
-	// Output: Shameless (US) - 08x11 - A Gallagher Pedicure
-}
 
 func TestAddic7edSearchAllWithGoodShow(t *testing.T) {
 	c := addic7ed.New()
