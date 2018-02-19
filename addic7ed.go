@@ -298,12 +298,12 @@ func (s Subtitle) IsOriginal() bool {
 	return !s.IsUpdated()
 }
 
-// DownloadTo download the subtitle to a given path
-func (s Subtitle) DownloadTo(path string) error {
+// Download download the subtitle in-memory, in a closable reader
+func (s Subtitle) Download() (io.ReadCloser, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", s.Link, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Avoid getting cached pages
 	req.Header.Add("Cache-Control", "no-cache")
@@ -312,9 +312,18 @@ func (s Subtitle) DownloadTo(path string) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("Unable to reach addic7ed server: %v", err)
+		return nil, fmt.Errorf("Unable to reach addic7ed server: %v", err)
 	}
-	defer resp.Body.Close()
+	return resp.Body, nil
+}
+
+// DownloadTo downloads the subtitle to a given path
+func (s Subtitle) DownloadTo(path string) error {
+	sub, err := s.Download()
+	if err != nil {
+		return err
+	}
+	defer sub.Close()
 
 	w, err := os.Create(path)
 	if err != nil {
@@ -322,7 +331,7 @@ func (s Subtitle) DownloadTo(path string) error {
 	}
 	defer w.Close()
 
-	_, err = io.Copy(w, resp.Body)
+	_, err = io.Copy(w, sub)
 	return err
 }
 

@@ -48,6 +48,12 @@ fmt.Println(showName) // Output: Shameless (US) - 08x11 - A Gallagher Pedicure
 fmt.Println(subtitle) // Output: the best suitable subtitle in English language
 fmt.Println(subtitle.Version) // Output: BATV
 fmt.Println(subtitle.Language) // Output: English
+
+// Download the subtitle to a given file name
+err := subtitle.DownloadTo("Shameless.US.S08E11.720p.HDTV.x264-BATV[ettv].srt")
+if err != nil {
+    panic(err)
+}
 ```
 
 In order to search the best subtitle, this API:
