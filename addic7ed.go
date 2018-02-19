@@ -308,6 +308,7 @@ func (s Subtitle) DownloadTo(path string) error {
 	// Avoid getting cached pages
 	req.Header.Add("Cache-Control", "no-cache")
 	req.Header.Add("User-Agent", userAgent)
+	req.Header.Add("Referer", s.Link) // Without it, the Addic7ed server redirect to the web page instead of dl the srt file
 
 	resp, err := client.Do(req)
 	if err != nil {
