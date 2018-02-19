@@ -26,7 +26,7 @@ if err != nil {
     panic(err)
 }
 fmt.Println(show.Name) // Output: Shameless (US) - 08x11 - A Gallagher Pedicure
-fmt.Println(show.Subtitles) // Output: all subtitles with version, languages and links to download
+fmt.Println(show.Subtitles) // Output: all subtitles with version, languages and download links
 ```
 
 In order to find all the subtitles, this API:
@@ -89,8 +89,8 @@ Available groupBy functions:
 
 ## Contributing
 
-See Contributing.md
+See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Licence
 
-MIT. This package is not affiliated to Addic7ed website.
+MIT. This package is not affiliated with Addic7ed website.
