@@ -28,12 +28,14 @@ func New() *Client {
 	return &Client{}
 }
 
+// NewVerbose creates a new client that will log verbosely to stdout
 func NewVerbose() *Client {
 	return &Client{
 		debug: true,
 	}
 }
 
+// Debug is used to set logging to verbose
 func (c *Client) Debug(isVerbose bool) {
 	c.debug = isVerbose
 }
