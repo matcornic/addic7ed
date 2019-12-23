@@ -26,3 +26,5 @@ _testmain.go
 .DS_Store
 coverage.txt
 vendor/
+.vscode
+.idea
