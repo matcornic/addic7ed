@@ -22,6 +22,7 @@ func TestAddic7edSearchAllWithGoodShow(t *testing.T) {
 		{"The Big Bang Theory - 06x12 - Web-dl 480p", "The Big Bang Theory - 06x12 - The Egg Salad Equivalency"},
 		{"Mr.Robot.S03E09.720p.HDTV.x264-AVS", "Mr. Robot - 03x09 - eps3.8_stage3.torrent"},
 		{"Dark.S01E05.720p.WEBRip.x264-STRiFE", "Dark - 01x05 - Truths"},
+		{"Borgia S01E01 BD Rip 720p Compact HEVC 10 Bit AAC Stereo EN SRT", "Borgia - 01x01 - 1492"},
 	}
 
 	for _, test := range flagtests {
@@ -49,7 +50,7 @@ func TestAddic7edAllWithUnknownShow(t *testing.T) {
 }
 
 func TestAddic7edSearchBestWithGoodShow(t *testing.T) {
-	c := addic7ed.New()
+	c := addic7ed.NewVerbose()
 	var flagtests = []struct {
 		inFile           string
 		inLang           string
@@ -60,6 +61,7 @@ func TestAddic7edSearchBestWithGoodShow(t *testing.T) {
 		{"This is Us S01E02", "English", "This is Us - 01x02 - The Big Three", "KILLERS"},
 		{"Transparent 04x09 AMZ.WEB-DL-NTb;WEB.h264-STRIFE", "English", "Transparent - 04x09 - They is on the Way", "AMZ.WEB-DL-NTb;WEB.h264-STRIFE"},
 		{"The Big Bang Theory - 06x12 - Web-dl 480p", "English", "The Big Bang Theory - 06x12 - The Egg Salad Equivalency", "480p.WEB-DL"},
+		{"The Big Bang Theory - 06x12 - Web-dl 480", "English", "The Big Bang Theory - 06x12 - The Egg Salad Equivalency", "480p.WEB-DL"},
 		{"Mr.Robot.S03E09.720p.HDTV.x264-AVS", "English", "Mr. Robot - 03x09 - eps3.8_stage3.torrent", "AVS-SVA"},
 		{"Dark.S01E05.720p.WEBRip.x264-STRiFE", "English", "Dark - 01x05 - Truths", "WEBRip.x264-STRiFE"},
 		{"The.Good.Fight.S01E02.1080p.WEB-DL.DD5.1.H264-ViSUM[rartv]", "English", "The Good Fight - 01x02 - First Week", "WEBRip"},

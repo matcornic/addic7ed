@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"unicode"
@@ -18,7 +19,8 @@ const userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:12.0) Gecko/20100101 Firef
 // Client is the addic7ed client
 type Client struct {
 	// doc is the indexed document, representing the page
-	doc *goquery.Document
+	doc   *goquery.Document
+	debug bool
 }
 
 // New creates an Addic7ed client, ready to interact with.
@@ -26,8 +28,31 @@ func New() *Client {
 	return &Client{}
 }
 
+func NewVerbose() *Client {
+	return &Client{
+		debug: true,
+	}
+}
+
+func (c *Client) Debug(isVerbose bool) {
+	c.debug = isVerbose
+}
+
+func (c *Client) logf(message string, params ...interface{}) {
+	if c.debug {
+		fmt.Printf(message+"\n", params...)
+	}
+}
+
+func (c *Client) log(message string, params ...interface{}) {
+	if c.debug {
+		fmt.Println(message)
+	}
+}
+
 func (c *Client) findShowName() (string, error) {
 	var show string
+	c.log("Searching for show name in current page...")
 	c.doc.Find(".titulo").Contents().EachWithBreak(func(i int, s *goquery.Selection) bool {
 		if !s.Is("small") {
 			show = strings.TrimSpace(s.Text())
@@ -36,8 +61,10 @@ func (c *Client) findShowName() (string, error) {
 		return true
 	})
 	if show == "" {
+		c.log("Show name is not found in current indexed page")
 		return "", errors.New("not found")
 	}
+	c.logf("Show name is: %v", show)
 	return show, nil
 }
 
@@ -67,9 +94,10 @@ func createDocFromURL(url string) (*goquery.Document, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Unable to reach addic7ed server: %v", err)
 	}
+	defer resp.Body.Close()
 
 	// We use goquery to fetch the page from Addic7ed in way that we can find data quickly like the JQuery way
-	doc, err := goquery.NewDocumentFromResponse(resp)
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to construct document from server response: %v", err)
 	}
@@ -83,30 +111,38 @@ func createDocFromURL(url string) (*goquery.Document, error) {
 // If more than one result is returned, we get the first one to match
 func (c *Client) fetchShowPage(fileName string) (string, error) {
 
-	doc, err := createDocFromURL(fmt.Sprintf("http://www.addic7ed.com/search.php?search=%v&Submit=Search", fileName))
+	c.log("Searching show using addic7ed search page...")
+	doc, err := createDocFromURL(fmt.Sprintf("http://www.addic7ed.com/srch.php?search=%v&Submit=Search", url.QueryEscape(fileName)))
 	if err != nil {
 		return "", err
 	}
 	c.doc = doc
+	c.log("Addic7ed is up and we found a page")
 
 	show, err := c.findShowName()
 	if err != nil {
+		c.log("Current page is not a show page, trying to find what is it...")
 		// Addic7ed did not find the page of the show from the search feature
 		results := c.findResults()
 		if len(results) == 0 {
-			return "", fmt.Errorf("Show not found for filename %v", fileName)
+			c.log("Current page is not a result page either. We don't know what it is.")
+			return "", fmt.Errorf("show not found for filename %v", fileName)
 		}
 		// If more result, we get the first result
+		c.logf("Current page is a results page containing %v resuts. It means the input filename matches with multiple shows.", len(results))
+		c.log("Getting show page from first result...")
 		doc, err := createDocFromURL("http://www.addic7ed.com/" + results[0])
 		if err != nil {
 			return "", err
 		}
+		c.log("We found a show page from first result")
 		c.doc = doc
 		show, err = c.findShowName()
 		if err != nil {
 			return "", err
 		}
 	}
+	c.logf("Current page is a show page: %v", show)
 	return show, nil
 }
 
@@ -140,36 +176,58 @@ func wordsFromString(s string) []string {
 // It searches for similarities in both the filename and the version
 // filename and versions are indexed by word, and the more there are common words, the more the version gets a good score
 // Similarity is computed from a scoring between word exact matching and word distance (with Jaro/Winkler distance algorithm)
-func scoreBestSubVersions(fileName string, subtitlesByVersion map[string]Subtitles) map[string]float64 {
-	const weightWhenExactMatch = 5
+func (c *Client) scoreBestSubVersions(fileName string, subtitlesByVersion map[string]Subtitles) map[string]float64 {
+	const weightWhenExactMatch = 10
 	wordsFromTitle := wordsFromString(fileName)
 	scores := map[string]float64{}
-
+	c.logf("Computing scores for file %v...", fileName)
 	for version := range subtitlesByVersion {
 		versionWords := wordsFromString(version)
+		exactMatchs := 0.0
+		var similarityScore float64
 		for _, subWordFromTitle := range wordsFromTitle {
 			for _, subWordFromVersion := range versionWords {
-				var score float64
-				if strings.EqualFold(subWordFromVersion, subWordFromTitle) {
-					// Give a important weight when we found exactly the same word in the version and the file
-					score = weightWhenExactMatch
-				}
 				// Similarity is a float computed from Jaro/Winkler distance
 				// 0 = no similarity at all, 1 = exact same string
-				similarityScore := textdistance.JaroWinklerDistance(strings.ToLower(subWordFromVersion), strings.ToLower(subWordFromTitle))
-				if val, ok := scores[version]; ok {
-					scores[version] = val + score + similarityScore
-				} else {
-					scores[version] = score + similarityScore
+				distanceScore := textdistance.JaroWinklerDistance(strings.ToLower(subWordFromVersion), strings.ToLower(subWordFromTitle))
+				if distanceScore > 0.9 {
+					exactMatchs += distanceScore
 				}
+				similarityScore += distanceScore
+
+				c.logf("--- Comparison: %v (version '%v' compared to '%v') - exact-matchs=%v => distance=%v",
+					version, subWordFromVersion, subWordFromTitle, exactMatchs, distanceScore)
 			}
 		}
+		searchCardinality := float64(len(versionWords) * len(wordsFromTitle)) // Number of comparisons
+		c.logf("== Search cardinality = (words in Version=%v)x(words in Filename=%v) = %v",
+			len(versionWords), len(wordsFromTitle), searchCardinality)
+		// Will lower the similarity score if there were a lot of word to compare
+		computedSimilarityScore := similarityScore / searchCardinality
+		c.logf("== Computed similarity = (similarity=%v)/(searchCardinality=%v) = %v",
+			similarityScore, searchCardinality, computedSimilarityScore,
+		)
+
+		// By multiplying by the number of matches, we ensure that a version with 3 exact matches is better than a version with 2 exact matches.
+		proportionExactMatchs := (exactMatchs) / float64(len(versionWords)) // Will tend to 1 (1 = all words in version are contained in filename)
+		exactMatchScore := float64(proportionExactMatchs * (exactMatchs * weightWhenExactMatch))
+		c.logf("== Exact match score =  (proportionOfExactMatchs=%v)x(exactMatch=%v)x(weigth=%v) = %v",
+			proportionExactMatchs, exactMatchs, weightWhenExactMatch, exactMatchScore,
+		)
+
+		scores[version] = computedSimilarityScore + exactMatchScore
+		c.log("=============================================================================")
+		c.logf("===> TOTAL SCORE FILE=%v VERSION=%v = (Computed similarity=%v)+(Exact match score=%v)=%v <===",
+			fileName, version, computedSimilarityScore, exactMatchScore, scores[version],
+		)
+		c.log("=============================================================================")
 	}
+
 	return scores
 }
 
 // findBestSubtitleFromScores returns the best suitable subtitle from the given scores
-func findBestSubtitleFromScores(scores map[string]float64, subtitlesByVersion map[string]Subtitles) Subtitle {
+func findBestSubtitleFromScores(scores map[string]float64, subtitlesByVersion map[string]Subtitles) (Subtitle, float64) {
 	// Get best version from score
 	var bestScore float64
 	var bestVersion string
@@ -201,7 +259,7 @@ func findBestSubtitleFromScores(scores map[string]float64, subtitlesByVersion ma
 		}
 		bestSub = sub
 	}
-	return bestSub
+	return bestSub, bestScore
 }
 
 // SearchBest searches in the Addic7ed website for the best suitable subtitle of given episode of a show
@@ -213,23 +271,31 @@ func (c *Client) SearchBest(showStr, lang string) (string, Subtitle, error) {
 	if err != nil {
 		return "", Subtitle{}, err
 	}
-
 	subsWithLang := show.Subtitles.Filter(WithLanguage(lang))
 	if len(subsWithLang) == 0 {
 		return "", Subtitle{}, fmt.Errorf("Unable to find any subtitles for show %q in %q. Check available languages on Addic7ed website and retry", show.Name, lang)
 	}
 
 	if len(subsWithLang) == 1 {
+		c.logf("Only one subtitle found for lang %v", subsWithLang[0])
 		return show.Name, subsWithLang[0], nil
 	}
 
 	subsByVersion := subsWithLang.GroupByVersion()
 
 	// Score the different version to find best suitable one
-	scores := scoreBestSubVersions(showStr, subsByVersion)
+	c.logf("Found %v different versions of subtitles, trying to find the best one...", len(subsByVersion))
+	scores := c.scoreBestSubVersions(showStr, subsByVersion)
+	if c.debug {
+		c.log("Scores are:")
+		for k, v := range scores {
+			c.logf(" - Version: %v => Score: %v", k, v)
+		}
+	}
 
 	// From the scores, find the best subtitle possible
-	bestSub := findBestSubtitleFromScores(scores, subsByVersion)
+	bestSub, bestScore := findBestSubtitleFromScores(scores, subsByVersion)
+	c.logf("=> Best sub: %v (%v) with score %v", bestSub.Version, bestSub.Link, bestScore)
 
 	return show.Name, bestSub, nil
 }
@@ -253,7 +319,6 @@ func (c *Client) SearchAll(showStr string) (Show, error) {
 			s.Find(".language").Each(func(j int, ss *goquery.Selection) {
 				language := ss.Text()
 				ss.Parent().Find(".buttonDownload").Each(func(k int, sss *goquery.Selection) {
-					//fmt.Println("test")
 					if val, ok := sss.Attr("href"); ok {
 						link := "http://www.addic7ed.com" + val
 
