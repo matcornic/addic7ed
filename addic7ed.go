@@ -46,7 +46,7 @@ func (c *Client) logf(message string, params ...interface{}) {
 	}
 }
 
-func (c *Client) log(message string, params ...interface{}) {
+func (c *Client) log(message string) {
 	if c.debug {
 		fmt.Println(message)
 	}
@@ -114,7 +114,9 @@ func createDocFromURL(url string) (*goquery.Document, error) {
 func (c *Client) fetchShowPage(fileName string) (string, error) {
 
 	c.log("Searching show using addic7ed search page...")
-	doc, err := createDocFromURL(fmt.Sprintf("http://www.addic7ed.com/srch.php?search=%v&Submit=Search", url.QueryEscape(fileName)))
+	url := fmt.Sprintf("http://www.addic7ed.com/srch.php?search=%v&Submit=Search", url.QueryEscape(fileName))
+	c.logf("Searching show using URL: %v", url)
+	doc, err := createDocFromURL(url)
 	if err != nil {
 		return "", err
 	}
@@ -273,6 +275,10 @@ func (c *Client) SearchBest(showStr, lang string) (string, Subtitle, error) {
 	if err != nil {
 		return "", Subtitle{}, err
 	}
+	c.log("Found subtitles:")
+	for _, sub := range show.Subtitles {
+		c.logf("- %v (%v) | %v", sub.Version, sub.Language, sub.Link)
+	}
 	subsWithLang := show.Subtitles.Filter(WithLanguage(lang))
 	if len(subsWithLang) == 0 {
 		return "", Subtitle{}, fmt.Errorf("Unable to find any subtitles for show %q in %q. Check available languages on Addic7ed website and retry", show.Name, lang)
@@ -320,7 +326,7 @@ func (c *Client) SearchAll(showStr string) (Show, error) {
 			title := strings.TrimSpace(s.Find(".NewsTitle").Text())
 			s.Find(".language").Each(func(j int, ss *goquery.Selection) {
 				language := ss.Text()
-				ss.Parent().Find(".buttonDownload").Each(func(k int, sss *goquery.Selection) {
+				ss.Parent().Find(".face-button").Each(func(k int, sss *goquery.Selection) {
 					if val, ok := sss.Attr("href"); ok {
 						link := "http://www.addic7ed.com" + val
 

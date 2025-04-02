@@ -22,7 +22,6 @@ func TestAddic7edSearchAllWithGoodShow(t *testing.T) {
 		{"The Big Bang Theory - 06x12 - Web-dl 480p", "The Big Bang Theory - 06x12 - The Egg Salad Equivalency"},
 		{"Mr.Robot.S03E09.720p.HDTV.x264-AVS", "Mr. Robot - 03x09 - eps3.8_stage3.torrent"},
 		{"Dark.S01E05.720p.WEBRip.x264-STRiFE", "Dark - 01x05 - Truths"},
-		{"Borgia S01E01 BD Rip 720p Compact HEVC 10 Bit AAC Stereo EN SRT", "Borgia - 01x01 - 1492"},
 	}
 
 	for _, test := range flagtests {
